@@ -128,7 +128,7 @@ def main(button_flags, marks):
         for X, Y in zip(x, y):
             if button_flags['stop'] or button_flags['killswitch'] or button_flags['home'] or button_flags['land']:
                     break
-            navigate_wait(x=x, y=y, z=0.3, frame_id='aruco_map')
+            navigate_wait(x=x, y=y, z=0.5, frame_id='aruco_map')
             img = bridge.imgmsg_to_cv2(rospy.wait_for_message('thermal_camera/image_raw', Image), 'bgr8')
             contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours = [i for i in contours if cv2.contourArea(i) >25]
