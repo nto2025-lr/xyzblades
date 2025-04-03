@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>XYZBlades command center</title>
+        <meta charset="UTF-8">
+        <meta lang="en">
+        <h1>XYZBlades command center</h1>
+        <link rel="stylesheet" href="static/style.css">
+    </head>
+    <body>
+        <div class="cont_btn">
+            <button class="start" onclick="send_start()">Старт</button>
+            <button class="stop" onclick="send_stop()">Стоп</button>
+            <button class="killswitch" onclick="send_kill()">Kill</button>
+            <button class="home" onclick="send_home()">Home</button>
+            <button class="land" onclick="send_land()">Land</button>
+            <button class="btntopic" onclick="change_topic('raw')">IMAGE RAW</button>
+            <button class="btntopic" onclick="change_topic('colordebug')">COLOR DEBUG</button>
+            <button class="btntopic" onclick="change_topic('maskdebug')">MASK DEBUG</button>
+            <button class="btntopic" onclick="change_topic('arucodetect')">ARUCO DETECT</button>
+            <div class="batt"></div>
+            <div class="readystate"></div>
+        </div>
+        <br><br>
+        <div class="cont">
+            <div class="map_square"></div>
+            <div class="topic_debug"></div>
+            <div class="coords_log"></div>
+        </div>
+    </body>
+
+    <script>
+
+        function send_start()
+        {
+            fetch('/start_handle');
+        }
+
+        function send_stop()
+        {
+            fetch('/stop_handle');
+        }
+
+        function send_kill()
+        {
+            fetch('/kill_handle');
+        }
+
+        function send_home()
+        {
+            fetch('/home_handle');
+        }
+
+        function send_land()
+        {
+            fetch('/land_handle');
+        }
+
+        const topics =
+        {
+            raw: ':8080/stream?topic=/main_camera/image_raw',
+            colordebug: ':8080/stream?topic=/debug',
+            maskdebug: ':8080/stream?topic=/thermal_camera/image_raw',
+            arucodetect: ':8080/stream?topic=/aruco_detect/debug',
+        }
+
+        const ip_addr = window.location.hostname;
+
+<!--        document.querySelector('.map_square').style.backgroundImage = `url('http://${ip_addr}:8080/stream?topic=/aruco_map/image')`;-->
+
+        function change_topic(topic)
+        {
+            document.querySelector('.topic_debug').style.backgroundImage = `url('http://${ip_addr}${topics[topic]}')`;
+            console.log(ip_addr);
+        }
+
+
+        let marks = [];
+        let coordslog = [];
+
+        const xcount = 8;
+        const ycount = 5;
+
+        function fetchmarks()
+        {
+            const mapdiv = document.getElementsByClassName("map_square")[0];
+            const coordslogdiv = document.getElementsByClassName("coords_log")[0];
+            fetch('/get_marks')
+            .then(response => response.json())
+            .then(data => {
+                    marks = data.marks;
+                    mapdiv.innerHTML = '';
+                    coordslog = [];
+                    marks.forEach(mark => {
+                    const x1 = (180 + 177.14 * mark[0]) / 1600 * 600;
+                    const y1 = (445 + 177.14 * mark[1]) / 1600 * 600;
+                    const x2 = (180 + 177.14 * mark[2]) / 1600 * 600;
+                    const y2 = (445 + 177.14 * mark[3]) / 1600 * 600;
+                    const length = Math.hypot(x2 - x1, y2 - y1);
+                    const angle = -Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+                    const thickness = 5;
+                    const line = document.createElement('div');
+                    line.className = 'line_class';
+                    line.style.position = 'absolute';
+                    line.style.left = `${x1}px`;
+                    line.style.bottom = `${y1}px`;
+                    line.style.width = `${length}px`;
+                    line.style.height = `${thickness}px`;
+                    line.style.transformOrigin = '0 0';
+                    line.style.transform = `rotate(${angle}deg)`;
+                    line.style.backgroundColor = mark[4];
+                    mapdiv.appendChild(line);
+
+                        const coordsElement = document.createElement('div');
+                        coordsElement.className = 'coords';
+                        coordsElement.innerText = `${mark[0]};${mark[1]}`;
+                        coordsElement.style.left = `${x1 - 4}px`;
+                        coordsElement.style.bottom = `${y1 + 31}px`;
+                        mapdiv.appendChild(coordsElement);
+
+                        /*switch(mark[2])
+                        {
+                            case 'red':
+                                color = 'красный';
+                                break;
+                            case 'blue':
+                                color = 'синий';
+                                break;
+                            case 'green':
+                                color = 'зеленый';
+                                break;
+                            case 'yellow':
+                                color = 'желтый';
+                                break;
+                            default:
+                                color = 'неизвестный';
+                                break;
+                        }
+                        coordslog.push(`X: ${mark[0]}; Y: ${mark[1]}, цвет: ${color}`);*/
+                    });
+                })
+                .catch(error => console.error('Ошибка:', error));
+            //console.log(marks)
+            coordslogdiv.innerText = coordslog.join('\n');
+        }
+
+        setInterval(fetchmarks, 500);
+
+        let volt = 0.0;
+        function fetchbattery()
+        {
+            displayBatt = document.getElementsByClassName('batt')[0];
+            displayState = document.getElementsByClassName('readystate')[0];
+            fetch('/get_voltage')
+            .then(response => response.json())
+            .then(data => {
+                volt = data.voltage;
+                state = data.state;
+                percent = Math.round((volt - 14.2) / (17 - 14.2) * 100);
+                console.log(volt);
+                displayBatt.innerHTML = '';
+                displayBatt.innerText = `Batt: ${volt}V; ${percent}%`;
+                displayState.innerHTML = '';
+                displayState.innerText = `State: ${state}`;
+            });
+        }
+        setInterval(fetchbattery, 500);
+    </script>
+</html>
