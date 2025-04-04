@@ -136,6 +136,7 @@ def main(button_flags, marks):
     # low = (0, 47, 98)
     # high = (51, 255, 255)
 
+    # параметры камеры
     camera_matrix = np.array([[332.47884746146343 / 2, 0, 320.0 / 2],
                               [0, 333.1761847948052 / 2, 240.0 / 2],
                               [0, 0, 1]])
@@ -159,7 +160,7 @@ def main(button_flags, marks):
     #
     #     return (X, Y)
 
-
+    # расчет евклидова расстояния
     def distance_calculate(p1, p2):
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
@@ -189,6 +190,7 @@ def main(button_flags, marks):
             rospy.sleep(0.2)
 
     flag_video_camera = True
+    # запись видео с камеры
     def record_video_camera():
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # Codec (e.g., XVID, MJPG, MP4V)
         out = cv2.VideoWriter('video_camera.avi', fourcc, 20.0, (320, 240))
@@ -198,6 +200,8 @@ def main(button_flags, marks):
         out.release()
 
     flag_video_thermal = True
+
+    # запись видео с тепловизора
     def record_video_thermal():
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # Codec (e.g., XVID, MJPG, MP4V)
         out2 = cv2.VideoWriter('video_thermal.avi', fourcc, 20.0, (256, 192))
@@ -206,6 +210,7 @@ def main(button_flags, marks):
             out2.write(img)
         out2.release()
 
+    # отправка сообщения на есп32 (на дронопорт)
     def send_message_to_esp32(message, esp32_ip, esp32_port):
         try:
 
@@ -223,7 +228,7 @@ def main(button_flags, marks):
         finally:
             sock.close()
 
-
+    # основная часть полета
     while True:
         print('while started')
         while not button_flags['start']:
@@ -269,7 +274,7 @@ def main(button_flags, marks):
                 x = int(moments["m10"] / moments["m00"])
                 y = int(moments["m01"] / moments["m00"])
                 dis = distance_calculate([x, y], [159, 119])
-                if dis < 60:
+                if dis < 100:
                     cords.append((X, Y))
                     marks.append(thermal_lines[number_of_line])
                     print(f'Thermal 1: {thermal_lines[number_of_line]}')
@@ -280,16 +285,18 @@ def main(button_flags, marks):
         flag_video_thermal = False
 
 
-        navigate_wait(x=4, y=0, z=1, speed=0.3, frame_id='aruco_map')
+        navigate_wait(x=4, y=0, z=1.5, speed=0.3, frame_id='aruco_map')
+        rospy.sleep(2)
         # navigate_wait(yellow_mid[0], yellow_mid[1], z=1.7, frame_id='aruco_map')
         navigate_wait(0, 0, 0, yaw=k, frame_id='body')
+        
         rospy.sleep(4)
 
         for i in yellow_illegal_coords:
             if button_flags['stop'] or button_flags['killswitch'] or button_flags['home'] or button_flags['land']:
                 break
             rospy.sleep(1)
-            navigate_wait(x=i[0], y=i[1], z=0.7, speed=0.3, frame_id='aruco_map')
+            navigate_wait(x=i[0], y=i[1], z=1, speed=0.3, frame_id='aruco_map')
             rospy.sleep(1)
             img = bridge.imgmsg_to_cv2(rospy.wait_for_message('main_camera/image_raw', Image), 'bgr8')
             img = cv2.undistort(img, camera_matrix, distortion_coefficients)
