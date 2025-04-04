@@ -1,3 +1,4 @@
+#импорты библиотек
 from flask import Flask, render_template, jsonify
 import rospy
 from sensor_msgs.msg import BatteryState
@@ -9,7 +10,7 @@ import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-
+#класс веб-приложения
 class Web:
     def __init__(self):
         self.app = Flask(__name__)
@@ -17,7 +18,7 @@ class Web:
         self.marks = None
         self.voltage = None
         self.state = None
-
+    #инициализация рос-ноды
     def init_ros_flask(self):
         rospy.init_node('web_interface', anonymous=True, disable_signals=True)
         rospy.spin()
@@ -28,13 +29,13 @@ class Web:
         self.state = sta
         self.batt_sub = rospy.Subscriber('/mavros/battery', BatteryState, self.batterycallback)
         self.state_sub = rospy.Subscriber('mavros/state', State, self.statecallback)
-
+    #функция для считывания батареи
     def batterycallback(self, msg):
         self.voltage.value = round(msg.voltage, 2)
 
     def statecallback(self, msg):
         self.state.value = msg.system_status
-
+    #маршруты Flask
     def create_routes(self):
         @self.app.route('/')
         def onstart():
