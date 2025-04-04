@@ -58,11 +58,13 @@ if __name__ == '__main__':
     voltage = manager.Value('d', 0.0)
     state = manager.Value('i', 0)
 
+
 def main(button_flags, marks):
     headers = {"Authorization": "Bearer e7dd0527-df2e-44ac-aa01-c436d76daf13"}
     response = rq.get(url="http://157.180.22.113:8080/coords_1.json", headers=headers)
     response = response.json()
-    yellow = [[response['nodes'][0]['x'], response['nodes'][0]['y']], [response['nodes'][1]['x'], response['nodes'][1]['y']]]
+    yellow = [[response['nodes'][0]['x'], response['nodes'][0]['y']],
+              [response['nodes'][1]['x'], response['nodes'][1]['y']]]
     yellow_mid = [(yellow[1][0] - yellow[0][0]) / 2 + yellow[0][0], (yellow[1][1] - yellow[0][1]) / 2 + yellow[0][1]]
     yellow_points = response['tappings']
     yellow_illegal = [i for i in response['tappings'] if i['legal'] == 0]
@@ -75,10 +77,9 @@ def main(button_flags, marks):
 
     for i in yellow_illegal:
         yellow_illegal_coords.append([i['x'], i['y']])
+    # определение углового коэффицента нефтепровода для поворота дрона
     K = (yellow[0][1] - yellow[0][0]) / (yellow[1][1] - yellow[1][0])
-    k =(math.pi / 2 - math.atan(K))
-
-
+    k = (math.pi / 2 - math.atan(K))
 
     x1, y1 = 6.5, 3.5
     x2, y2 = 4, 0.5
@@ -92,14 +93,15 @@ def main(button_flags, marks):
 
     thermal_lines = [[x2, y2, x2 + (x1 - x2) / 4, y2 + (y1 - y2) / 4, 'red'],
                      [x2 + (x1 - x2) / 4, y2 + (y1 - y2) / 4, x2 + (x1 - x2) / 4 * 2, y2 + (y1 - y2) / 4 * 2, 'red'],
-                     [x2 + (x1 - x2) / 4 * 2, y2 + (y1 - y2) / 4 * 2, x2 + (x1 - x2) / 4 * 3, y2 + (y1 - y2) / 4 * 3, 'red'],
+                     [x2 + (x1 - x2) / 4 * 2, y2 + (y1 - y2) / 4 * 2, x2 + (x1 - x2) / 4 * 3, y2 + (y1 - y2) / 4 * 3,
+                      'red'],
                      [x2 + (x1 - x2) / 4 * 3, y2 + (y1 - y2) / 4 * 3, x1, y1, 'red']]
 
     print(f'thermal_lines: {thermal_lines}')
 
     for i in range(4):
-        x.append((x1-x2) / 8 + x2 + 2 * i * (x1-x2) / 8)
-        y.append((y1-y2) / 8 + y2 + 2 * i * (y1-y2) / 8)
+        x.append((x1 - x2) / 8 + x2 + 2 * i * (x1 - x2) / 8)
+        y.append((y1 - y2) / 8 + y2 + 2 * i * (y1 - y2) / 8)
 
     print(x, y)
 
@@ -108,7 +110,9 @@ def main(button_flags, marks):
     poly = []
     fin = []
     cords_points = []
-
+    
+    
+    
     cords = []
 
     bridge = CvBridge()
@@ -142,10 +146,8 @@ def main(button_flags, marks):
                               [0, 0, 1]])
 
     distortion_coefficients = np.array([0.215356885, -0.117472846, -0.000306197672,
-                                         -0.000109444025, -0.00453657258,
-                                         0.573090623, -0.127574577, -0.0286125589])
-
-
+                                        -0.000109444025, -0.00453657258,
+                                        0.573090623, -0.127574577, -0.0286125589])
 
     # def px2cam(points):
     #     h = rospy.wait_for_message('/rangefinder/range', Range).range
@@ -164,10 +166,9 @@ def main(button_flags, marks):
     def distance_calculate(p1, p2):
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
-
-
     # navigation with code blocking
     xs, ys = 0, 0
+
     def navigate_wait(x=0, y=0, z=1, yaw=float('nan'), speed=0.5, frame_id='aruco_map', auto_arm=False, tolerance=0.2):
         if button_flags['home']:
             navigate(x=xs, y=ys, z=z, yaw=yaw, speed=speed, frame_id=frame_id, auto_arm=auto_arm)
@@ -181,7 +182,7 @@ def main(button_flags, marks):
             if button_flags['home']:
                 pass
             else:
-                if button_flags['stop'] and (x!=xs or x!=ys):
+                if button_flags['stop'] and (x != xs or x != ys):
                     break
 
             telem = get_telemetry(frame_id='navigate_target')
@@ -190,6 +191,7 @@ def main(button_flags, marks):
             rospy.sleep(0.2)
 
     flag_video_camera = True
+
     # запись видео с камеры
     def record_video_camera():
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # Codec (e.g., XVID, MJPG, MP4V)
@@ -255,11 +257,13 @@ def main(button_flags, marks):
         threading.Thread(target=record_video_camera, daemon=True).start()
         threading.Thread(target=record_video_thermal, daemon=True).start()
 
+        # полет по линии с тепловизором
         for X, Y in zip(x, y):
             if button_flags['stop'] or button_flags['killswitch'] or button_flags['home'] or button_flags['land']:
                 break
             navigate_wait(x=X, y=Y, z=1, frame_id='aruco_map')
 
+            # обработка изображения для алгоритма определения теплопотерь
             img = bridge.imgmsg_to_cv2(rospy.wait_for_message('thermal_camera/image_raw', Image), 'bgr8')
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             _, thresh = cv2.threshold(img, 125, 255, cv2.THRESH_BINARY)
@@ -284,20 +288,23 @@ def main(button_flags, marks):
         flag_video_camera = False
         flag_video_thermal = False
 
-
         navigate_wait(x=4, y=0, z=1.5, speed=0.3, frame_id='aruco_map')
         rospy.sleep(2)
         # navigate_wait(yellow_mid[0], yellow_mid[1], z=1.7, frame_id='aruco_map')
-        navigate_wait(0, 0, 0, yaw=k, frame_id='body')
         
+        # поворот параллельно нефтепроводу
+        navigate_wait(0, 0, 0, yaw=k, frame_id='body')
+
         rospy.sleep(4)
 
+        #полет по нефтепроводу
         for i in yellow_illegal_coords:
             if button_flags['stop'] or button_flags['killswitch'] or button_flags['home'] or button_flags['land']:
                 break
             rospy.sleep(1)
             navigate_wait(x=i[0], y=i[1], z=1, speed=0.3, frame_id='aruco_map')
             rospy.sleep(1)
+            #обработка изображения для отсечения центральной линии нефтепровода, а также для определения врезок
             img = bridge.imgmsg_to_cv2(rospy.wait_for_message('main_camera/image_raw', Image), 'bgr8')
             img = cv2.undistort(img, camera_matrix, distortion_coefficients)
 
@@ -306,22 +313,22 @@ def main(button_flags, marks):
             kernel = np.ones((5, 5), np.uint8)
             open_img = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-
             # new = np.zeros_like(img)
 
             # new = cv2.cvtColor(new, cv2.COLOR_GRAY2BGR)
 
+            # отсечение центральной линии нефтепровода
             x = 40
             cv2.rectangle(open_img, (159 - x, 0), (159 + x, 239), (0, 0, 0), thickness=cv2.FILLED)
             contours, _ = cv2.findContours(open_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours = [i for i in contours if cv2.contourArea(i) > 50]
 
             points = []
-
+            # поиск ближайшего контура к центру камеры, если такие есть
             if len(contours) >= 2:
                 min_dist = float('inf')
                 closest_cnt = None
-                for j in range(len(contours)-1):
+                for j in range(len(contours) - 1):
                     for h in contours[j]:
                         dist = distance_calculate(h, [158, 119])
                         if dist < min_dist:
@@ -333,6 +340,8 @@ def main(button_flags, marks):
                 points.append(contours[0])
 
             # mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+            # сохранение изобраение в директорию дрона и дебаг изображения в топик /debug
             if contours != []:
                 cv2.rectangle(img, (159 - x, 239), (159 + x, 0), (255, 255, 255), thickness=cv2.FILLED)
                 cv2.drawContours(img, points, -1, (0, 0, 255), thickness=cv2.FILLED)
